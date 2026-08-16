@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Orakil</title>
+<style>
+  :root {
+    --bg-dark: #0b0d12;
+    --bg-dark-2: #12151d;
+    --marble: #f4efe4;
+    --marble-dim: #d9d2c2;
+    --gold: #b08d57;
+    --gold-light: #d9b878;
+    --ink: #2a2620;
+    --error: #c56a5a;
+    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(176,141,87,0.12), transparent 55%),
+      radial-gradient(ellipse at 80% 110%, rgba(176,141,87,0.08), transparent 50%),
+      linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-dark-2) 100%);
+    color: var(--marble);
+    font-family: var(--sans);
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 32px 20px 48px;
+  }
+
+  .stars {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(244,239,228,0.5), transparent),
+      radial-gradient(1px 1px at 80% 15%, rgba(244,239,228,0.4), transparent),
+      radial-gradient(1px 1px at 60% 70%, rgba(244,239,228,0.3), transparent),
+      radial-gradient(1px 1px at 30% 85%, rgba(244,239,228,0.4), transparent),
+      radial-gradient(1px 1px at 90% 60%, rgba(244,239,228,0.3), transparent),
+      radial-gradient(1px 1px at 45% 40%, rgba(244,239,228,0.25), transparent);
+    background-size: 100% 100%;
+    z-index: 0;
+  }
+
+  .temple {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 440px;
+    text-align: center;
+  }
+
+  .columns {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 6px;
+    margin-bottom: -6px;
+  }
+
+  .column {
+    width: 14px;
+    height: 34px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--marble-dim) 0 2px,
+      var(--marble) 2px 4px
+    );
+    border-top: 3px solid var(--gold);
+    opacity: 0.5;
+    border-radius: 1px;
+  }
+
+  .card {
+    background: linear-gradient(160deg, rgba(244,239,228,0.05), rgba(244,239,228,0.02));
+    border: 1px solid rgba(176,141,87,0.35);
+    border-radius: 6px;
+    padding: 32px 24px 28px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 2.4rem;
+    letter-spacing: 0.06em;
+    margin: 4px 0 6px;
+    background: linear-gradient(180deg, var(--gold-light), var(--gold));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+    color: var(--marble-dim);
+    margin: 0 0 28px;
+    line-height: 1.5;
+  }
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  input[type="text"] {
+    background: rgba(11,13,18,0.5);
+    border: 1px solid rgba(176,141,87,0.4);
+    border-radius: 4px;
+    padding: 13px 14px;
+    font-size: 1rem;
+    color: var(--marble);
+    font-family: var(--sans);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]::placeholder {
+    color: rgba(217,210,194,0.45);
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--gold-light);
+  }
+
+  button {
+    font-family: var(--sans);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 14px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--gold);
+    background: linear-gradient(180deg, var(--gold-light), var(--gold));
+    color: #221a0e;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  button:hover { box-shadow: 0 6px 20px rgba(176,141,87,0.3); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: 0.6; cursor: default; box-shadow: none; }
+
+  button.secondary {
+    background: transparent;
+    color: var(--marble);
+    border: 1px solid rgba(176,141,87,0.5);
+  }
+
+  .status {
+    display: none;
+    margin-top: 24px;
+    color: var(--marble-dim);
+    font-size: 0.92rem;
+  }
+  .status.visible { display: block; }
+
+  .status .flame {
+    display: inline-block;
+    animation: flicker 1.4s ease-in-out infinite;
+  }
+
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .result {
+    display: none;
+    margin-top: 24px;
+  }
+  .result.visible { display: block; }
+
+  .spruch {
+    font-family: var(--serif);
+    font-size: 1.3rem;
+    line-height: 1.6;
+    color: var(--marble);
+    filter: blur(8px);
+    opacity: 0;
+    animation: reveal 1.3s ease-out forwards;
+  }
+
+  @keyframes reveal {
+    to { filter: blur(0); opacity: 1; }
+  }
+
+  .result-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 22px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .error {
+    display: none;
+    margin-top: 24px;
+    color: var(--error);
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+  .error.visible { display: block; }
+
+  form.hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="stars"></div>
+<div class="temple">
+  <div class="columns"><div class="column"></div><div class="column"></div><div class="column"></div></div>
+  <div class="card">
+    <h1>Orakil</h1>
+    <p class="subtitle">Gib dem Orakel drei Stichworte zu deiner aktuellen Situation mit Künstlicher Intelligenz – und höre seinen Spruch.</p>
+
+    <form id="orakil-form">
+      <input type="text" id="kw1" placeholder="Stichwort 1" maxlength="60" autocomplete="off">
+      <input type="text" id="kw2" placeholder="Stichwort 2" maxlength="60" autocomplete="off">
+      <input type="text" id="kw3" placeholder="Stichwort 3" maxlength="60" autocomplete="off">
+      <button type="submit">Frage das Orakel</button>
+    </form>
+
+    <div class="status" id="status"><span class="flame">🕯</span> Das Orakel denkt nach …</div>
+
+    <div class="result" id="result">
+      <p class="spruch" id="spruch-text"></p>
+      <div class="result-actions">
+        <button type="button" id="retry-btn">Nochmal</button>
+        <button type="button" class="secondary" id="new-btn">Neue Stichworte</button>
+      </div>
+    </div>
+
+    <div class="error" id="error">
+      <p id="error-text">Das Orakel ist gerade nicht erreichbar.</p>
+      <div class="result-actions">
+        <button type="button" id="error-retry-btn">Nochmal versuchen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Nach dem Deploy des Workers hier die echte Worker-URL eintragen.
+  const WORKER_URL = "https://super-bird-4f87.david-halser.workers.dev";
+  const REQUEST_TIMEOUT_MS = 20000;
+
+  const form = document.getElementById("orakil-form");
+  const statusEl = document.getElementById("status");
+  const resultEl = document.getElementById("result");
+  const errorEl = document.getElementById("error");
+  const errorTextEl = document.getElementById("error-text");
+  const spruchTextEl = document.getElementById("spruch-text");
+  const retryBtn = document.getElementById("retry-btn");
+  const newBtn = document.getElementById("new-btn");
+  const errorRetryBtn = document.getElementById("error-retry-btn");
+
+  let lastKeywords = [];
+
+  function showStatus() {
+    form.classList.add("hidden");
+    statusEl.classList.add("visible");
+    resultEl.classList.remove("visible");
+    errorEl.classList.remove("visible");
+  }
+
+  function showResult(text) {
+    statusEl.classList.remove("visible");
+    errorEl.classList.remove("visible");
+    spruchTextEl.style.animation = "none";
+    // Reflow erzwingen, damit die Reveal-Animation bei jedem neuen Spruch neu startet
+    void spruchTextEl.offsetWidth;
+    spruchTextEl.style.animation = "";
+    spruchTextEl.textContent = text;
+    resultEl.classList.add("visible");
+  }
+
+  function showError(message) {
+    statusEl.classList.remove("visible");
+    resultEl.classList.remove("visible");
+    errorTextEl.textContent = message;
+    errorEl.classList.add("visible");
+  }
+
+  async function askOracle(keywords) {
+    showStatus();
+    lastKeywords = keywords;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const res = await fetch(`${WORKER_URL}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keywords }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error("http_" + res.status);
+      }
+
+      const data = await res.json();
+      if (!data.spruch) {
+        throw new Error("empty");
+      }
+      showResult(data.spruch);
+    } catch (err) {
+      showError("Das Orakel ist gerade nicht erreichbar. Versuch es noch einmal.");
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const keywords = [
+      document.getElementById("kw1").value,
+      document.getElementById("kw2").value,
+      document.getElementById("kw3").value,
+    ];
+    askOracle(keywords);
+  });
+
+  retryBtn.addEventListener("click", () => askOracle(lastKeywords));
+  errorRetryBtn.addEventListener("click", () => askOracle(lastKeywords));
+
+  newBtn.addEventListener("click", () => {
+    document.getElementById("kw1").value = "";
+    document.getElementById("kw2").value = "";
+    document.getElementById("kw3").value = "";
+    resultEl.classList.remove("visible");
+    errorEl.classList.remove("visible");
+    form.classList.remove("hidden");
+  });
+</script>
+</body>
+</html>
