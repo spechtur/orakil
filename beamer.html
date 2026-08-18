@@ -229,10 +229,13 @@
   .placeholder {
     text-align: center;
     color: var(--marble-dim);
-    font-size: 1.4rem;
-    margin-top: 8vh;
     font-family: var(--serif);
     font-style: italic;
+    font-size: clamp(1.7rem, 2.7vw, 3.5rem);
+    line-height: 1.4;
+    max-width: 20em;
+    margin: 12vh auto 0;
+    text-wrap: balance;
   }
 
   .placeholder.revealing { animation: reveal 1.6s ease-out; }
@@ -723,13 +726,24 @@
     position: fixed;
     inset: 0;
     z-index: 6;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
     background: radial-gradient(ellipse 80% 80% at 50% 50%, rgba(8,9,13,0.94) 40%, rgba(8,9,13,0.62) 100%);
     cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    /* Bewusst Transition statt Animation: bleibt ein Uebergang aus, ist der
+       Code sofort sichtbar – nicht unsichtbar wie bei einer haengenden Animation */
+    transition: opacity 0.6s ease, visibility 0s linear 0.6s;
   }
-  .qr-overlay.visible { display: flex; }
+  .qr-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.6s ease, visibility 0s;
+  }
 
   .qr-frame {
     position: relative;
@@ -743,8 +757,10 @@
     box-shadow:
       0 30px 80px rgba(0,0,0,0.6),
       0 0 70px rgba(255,150,50,0.10);
+    transform: scale(0.965);
+    transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.3, 1);
   }
-  /* Bewusst ohne Einblend-Animation: der Code muss sofort und immer sichtbar sein */
+  .qr-overlay.visible .qr-frame { transform: scale(1); }
 
   /* Mäander auf allen vier Seiten */
   .qr-edge { position: absolute; opacity: 0.6; pointer-events: none; }
@@ -825,6 +841,7 @@
     .spruch-card, .focus-text, .focus-new, .qr-frame, .placeholder {
       animation: none !important;
     }
+    .qr-overlay, .qr-frame { transition: none !important; }
     .mist i, .smoke i { opacity: 0.5; }
     .spruch-card, .focus-text { filter: none; opacity: 1; }
     .focus-text.revealing { animation: none !important; }
