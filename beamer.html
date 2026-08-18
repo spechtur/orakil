@@ -30,6 +30,8 @@
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     /* Mäander-Fries als Inline-SVG – keine externe Abhängigkeit */
     --meander: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M0 18H20M2 18V6H16V14H8V10H12' fill='none' stroke='%23b08d57' stroke-width='2'/%3E%3C/svg%3E");
+    /* Gleiche Kachel um 90 Grad gedreht – fuer die senkrechten Rahmenseiten */
+    --meander-v: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cg transform='rotate(90 10 10)'%3E%3Cpath d='M0 18H20M2 18V6H16V14H8V10H12' fill='none' stroke='%23b08d57' stroke-width='2'/%3E%3C/g%3E%3C/svg%3E");
   }
 
   * { box-sizing: border-box; }
@@ -597,8 +599,7 @@
   .sound-hint {
     position: fixed;
     top: 18px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 20px;
     z-index: 8;
     display: none;
     font-family: var(--sans);
@@ -717,12 +718,84 @@
   }
   .focus-new.visible { display: block; }
 
+  /* ---------- QR-Code zur Eingabeseite ---------- */
+  .qr-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 6;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse 80% 80% at 50% 50%, rgba(8,9,13,0.94) 40%, rgba(8,9,13,0.62) 100%);
+    cursor: pointer;
+  }
+  .qr-overlay.visible { display: flex; }
+
+  .qr-frame {
+    position: relative;
+    padding: 40px;
+    text-align: center;
+    background:
+      linear-gradient(160deg, rgba(244,239,228,0.07), rgba(244,239,228,0.03)),
+      rgba(10,12,17,0.92);
+    border: 1px solid rgba(176,141,87,0.5);
+    border-radius: 4px;
+    box-shadow:
+      0 30px 80px rgba(0,0,0,0.6),
+      0 0 70px rgba(255,150,50,0.10);
+  }
+  /* Bewusst ohne Einblend-Animation: der Code muss sofort und immer sichtbar sein */
+
+  /* Mäander auf allen vier Seiten */
+  .qr-edge { position: absolute; opacity: 0.6; pointer-events: none; }
+  .qr-edge.top, .qr-edge.bottom {
+    left: 12px; right: 12px; height: 20px;
+    background-image: var(--meander);
+    background-size: auto 20px;
+    background-repeat: repeat-x;
+  }
+  .qr-edge.top { top: 10px; }
+  .qr-edge.bottom { bottom: 10px; transform: rotate(180deg); }
+  .qr-edge.left, .qr-edge.right {
+    top: 12px; bottom: 12px; width: 20px;
+    background-image: var(--meander-v);
+    background-size: 20px auto;
+    background-repeat: repeat-y;
+  }
+  .qr-edge.left { left: 10px; }
+  .qr-edge.right { right: 10px; transform: rotate(180deg); }
+
+  .qr {
+    display: block;
+    width: min(56vh, 44vw);
+    height: auto;
+    border-radius: 2px;
+  }
+
+  .qr-caption {
+    font-family: var(--display);
+    font-size: 1.15rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+    margin: 26px 0 6px;
+  }
+
+  .qr-url {
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    color: var(--marble-dim);
+    margin: 0;
+  }
+
+  /* Der Text auf dem leeren Screen blendet den QR-Code ein */
+  .placeholder { cursor: pointer; }
+
   /* ---------- Rückgängig nach dem Leeren ---------- */
   .undo-bar {
     position: fixed;
-    top: 18px;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: 20px;
+    left: 20px;
     z-index: 7;
     display: none;
     align-items: center;
@@ -749,7 +822,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .mist i, .firelight, .brazier-glow, .flame, .embers i, .smoke i,
-    .spruch-card, .focus-text, .focus-new {
+    .spruch-card, .focus-text, .focus-new, .qr-frame, .placeholder {
       animation: none !important;
     }
     .mist i, .smoke i { opacity: 0.5; }
@@ -804,6 +877,7 @@
   <button class="ctrl" id="focus-btn" type="button" disabled>Einzeln zeigen</button>
   <button class="ctrl" id="download-btn" type="button" disabled>Download</button>
   <button class="ctrl" id="clear-btn" type="button" disabled>Leeren</button>
+  <button class="ctrl" id="qr-btn" type="button">QR-Code</button>
   <button class="ctrl" id="fullscreen-btn" type="button">Vollbild</button>
   <div class="ctrl-group">
     <button class="ctrl" id="mute-btn" type="button">Ton aus</button>
@@ -831,6 +905,19 @@
 <div class="undo-bar" id="undo-bar">
   <span>Screen geleert.</span>
   <button class="ctrl" id="undo-btn" type="button">Rückgängig</button>
+</div>
+
+<div class="qr-overlay" id="qr-overlay">
+  <div class="qr-frame">
+    <span class="qr-edge top"></span>
+    <span class="qr-edge right"></span>
+    <span class="qr-edge bottom"></span>
+    <span class="qr-edge left"></span>
+    <!-- Statisch erzeugt und mit einem Scanner geprueft: keine Bibliothek, kein Netzzugriff noetig -->
+    <svg class="qr" viewBox="-4 -4 41 41" shape-rendering="crispEdges" role="img" aria-label="QR-Code zur Eingabeseite"><rect x="-4" y="-4" width="41" height="41" fill="#f4efe4"/><path d="M0 0h7v1h-7zM8 0h2v1h-2zM16 0h4v1h-4zM22 0h3v1h-3zM26 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM12 1h1v1h-1zM14 1h1v1h-1zM16 1h4v1h-4zM21 1h3v1h-3zM26 1h1v1h-1zM32 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM9 2h1v1h-1zM11 2h2v1h-2zM15 2h1v1h-1zM18 2h1v1h-1zM20 2h1v1h-1zM23 2h2v1h-2zM26 2h1v1h-1zM28 2h3v1h-3zM32 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM8 3h1v1h-1zM11 3h1v1h-1zM13 3h2v1h-2zM16 3h4v1h-4zM22 3h1v1h-1zM26 3h1v1h-1zM28 3h3v1h-3zM32 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM9 4h1v1h-1zM12 4h3v1h-3zM16 4h2v1h-2zM21 4h1v1h-1zM23 4h1v1h-1zM26 4h1v1h-1zM28 4h3v1h-3zM32 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM10 5h1v1h-1zM12 5h3v1h-3zM17 5h1v1h-1zM20 5h1v1h-1zM22 5h3v1h-3zM26 5h1v1h-1zM32 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h7v1h-7zM11 7h2v1h-2zM15 7h3v1h-3zM21 7h1v1h-1zM23 7h1v1h-1zM2 8h1v1h-1zM4 8h3v1h-3zM8 8h1v1h-1zM10 8h1v1h-1zM16 8h1v1h-1zM21 8h1v1h-1zM23 8h3v1h-3zM29 8h1v1h-1zM32 8h1v1h-1zM0 9h1v1h-1zM2 9h2v1h-2zM5 9h1v1h-1zM8 9h2v1h-2zM11 9h1v1h-1zM13 9h3v1h-3zM17 9h4v1h-4zM26 9h1v1h-1zM32 9h1v1h-1zM1 10h2v1h-2zM4 10h8v1h-8zM15 10h3v1h-3zM24 10h1v1h-1zM26 10h1v1h-1zM28 10h2v1h-2zM31 10h2v1h-2zM2 11h1v1h-1zM8 11h2v1h-2zM14 11h1v1h-1zM18 11h1v1h-1zM20 11h2v1h-2zM26 11h1v1h-1zM32 11h1v1h-1zM4 12h1v1h-1zM6 12h1v1h-1zM12 12h2v1h-2zM17 12h2v1h-2zM21 12h2v1h-2zM25 12h2v1h-2zM32 12h1v1h-1zM1 13h2v1h-2zM4 13h1v1h-1zM7 13h1v1h-1zM12 13h4v1h-4zM17 13h1v1h-1zM19 13h1v1h-1zM24 13h3v1h-3zM30 13h3v1h-3zM0 14h1v1h-1zM2 14h1v1h-1zM4 14h1v1h-1zM6 14h2v1h-2zM9 14h1v1h-1zM11 14h2v1h-2zM14 14h3v1h-3zM19 14h3v1h-3zM24 14h1v1h-1zM29 14h1v1h-1zM31 14h2v1h-2zM3 15h3v1h-3zM8 15h1v1h-1zM10 15h2v1h-2zM15 15h1v1h-1zM17 15h1v1h-1zM19 15h1v1h-1zM21 15h5v1h-5zM27 15h1v1h-1zM31 15h2v1h-2zM0 16h3v1h-3zM6 16h1v1h-1zM8 16h1v1h-1zM12 16h4v1h-4zM17 16h2v1h-2zM20 16h3v1h-3zM25 16h2v1h-2zM32 16h1v1h-1zM0 17h4v1h-4zM5 17h1v1h-1zM7 17h1v1h-1zM9 17h1v1h-1zM12 17h1v1h-1zM17 17h1v1h-1zM21 17h1v1h-1zM26 17h1v1h-1zM29 17h4v1h-4zM1 18h1v1h-1zM3 18h1v1h-1zM6 18h3v1h-3zM11 18h1v1h-1zM14 18h2v1h-2zM19 18h1v1h-1zM21 18h2v1h-2zM26 18h1v1h-1zM28 18h1v1h-1zM30 18h1v1h-1zM32 18h1v1h-1zM0 19h1v1h-1zM2 19h1v1h-1zM4 19h2v1h-2zM7 19h1v1h-1zM9 19h1v1h-1zM11 19h1v1h-1zM15 19h1v1h-1zM18 19h2v1h-2zM21 19h1v1h-1zM32 19h1v1h-1zM1 20h1v1h-1zM3 20h1v1h-1zM6 20h2v1h-2zM12 20h1v1h-1zM14 20h3v1h-3zM19 20h4v1h-4zM24 20h3v1h-3zM29 20h1v1h-1zM31 20h1v1h-1zM4 21h2v1h-2zM7 21h1v1h-1zM9 21h1v1h-1zM12 21h2v1h-2zM15 21h1v1h-1zM19 21h2v1h-2zM24 21h3v1h-3zM29 21h1v1h-1zM31 21h2v1h-2zM0 22h1v1h-1zM3 22h2v1h-2zM6 22h4v1h-4zM14 22h1v1h-1zM19 22h1v1h-1zM22 22h1v1h-1zM26 22h3v1h-3zM30 22h3v1h-3zM1 23h2v1h-2zM7 23h1v1h-1zM9 23h3v1h-3zM19 23h1v1h-1zM21 23h2v1h-2zM25 23h1v1h-1zM31 23h2v1h-2zM0 24h1v1h-1zM3 24h2v1h-2zM6 24h1v1h-1zM9 24h2v1h-2zM12 24h1v1h-1zM18 24h1v1h-1zM21 24h1v1h-1zM23 24h6v1h-6zM31 24h1v1h-1zM8 25h1v1h-1zM11 25h1v1h-1zM13 25h1v1h-1zM15 25h2v1h-2zM19 25h1v1h-1zM23 25h2v1h-2zM28 25h3v1h-3zM32 25h1v1h-1zM0 26h7v1h-7zM9 26h2v1h-2zM12 26h4v1h-4zM17 26h1v1h-1zM20 26h2v1h-2zM23 26h2v1h-2zM26 26h1v1h-1zM28 26h5v1h-5zM0 27h1v1h-1zM6 27h1v1h-1zM8 27h2v1h-2zM17 27h1v1h-1zM19 27h4v1h-4zM24 27h1v1h-1zM28 27h1v1h-1zM32 27h1v1h-1zM0 28h1v1h-1zM2 28h3v1h-3zM6 28h1v1h-1zM8 28h2v1h-2zM11 28h1v1h-1zM13 28h3v1h-3zM18 28h1v1h-1zM20 28h1v1h-1zM22 28h1v1h-1zM24 28h6v1h-6zM31 28h1v1h-1zM0 29h1v1h-1zM2 29h3v1h-3zM6 29h1v1h-1zM10 29h2v1h-2zM13 29h1v1h-1zM16 29h2v1h-2zM20 29h2v1h-2zM28 29h1v1h-1zM30 29h3v1h-3zM0 30h1v1h-1zM2 30h3v1h-3zM6 30h1v1h-1zM8 30h2v1h-2zM12 30h1v1h-1zM14 30h2v1h-2zM17 30h1v1h-1zM19 30h3v1h-3zM23 30h3v1h-3zM27 30h3v1h-3zM32 30h1v1h-1zM0 31h1v1h-1zM6 31h1v1h-1zM11 31h2v1h-2zM14 31h4v1h-4zM19 31h3v1h-3zM24 31h4v1h-4zM31 31h1v1h-1zM0 32h7v1h-7zM9 32h2v1h-2zM13 32h1v1h-1zM15 32h2v1h-2zM18 32h4v1h-4zM23 32h2v1h-2zM26 32h4v1h-4zM31 32h2v1h-2z" fill="#12100c"/></svg>
+    <p class="qr-caption">Drei Stichworte an das Orakil</p>
+    <p class="qr-url">spechtur.github.io/orakil</p>
+  </div>
 </div>
 
 <div class="reconnect-hint" id="reconnect-hint">Verbindung zum Orakel wird wiederhergestellt …</div>
@@ -880,6 +967,8 @@
   const soundHint = document.getElementById("sound-hint");
   const fullscreenBtn = document.getElementById("fullscreen-btn");
   const pauseBtn = document.getElementById("pause-btn");
+  const qrBtn = document.getElementById("qr-btn");
+  const qrOverlay = document.getElementById("qr-overlay");
 
   const knownKeys = new Set();
   // sprueche: älteste zuerst
@@ -1158,12 +1247,14 @@
 
   document.addEventListener("keydown", (e) => {
     showControls();
+    if (e.key === "Escape" && qrVisible()) { toggleQr(false); return; }
     if (e.key === "Escape" && inFocus) { exitFocus(); return; }
     // Enter/Leertaste würde sonst zusätzlich den fokussierten Button auslösen
     const onButton = e.target && e.target.closest && e.target.closest("button");
     if (onButton && (e.key === "Enter" || e.key === " ")) return;
     if (e.key === "m" || e.key === "M") { muteBtn.click(); return; }
     if (e.key === "p" || e.key === "P") { pauseBtn.click(); return; }
+    if (e.key === "q" || e.key === "Q") { toggleQr(); return; }
     if (e.key === "f" || e.key === "F") { toggleFullscreen(); return; }
     if (e.key === "Enter" || e.key === "e" || e.key === "E") {
       if (!inFocus) enterFocus(); else exitFocus();
@@ -1174,6 +1265,23 @@
     if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); step(-1); }
     if (e.key === "n" || e.key === "N") showFocusEntry(sprueche.length - 1);
   });
+
+  /* ---------- QR-Code ---------- */
+
+  function qrVisible() {
+    return qrOverlay.classList.contains("visible");
+  }
+
+  function toggleQr(show) {
+    const next = show === undefined ? !qrVisible() : show;
+    qrOverlay.classList.toggle("visible", next);
+    qrBtn.textContent = next ? "QR ausblenden" : "QR-Code";
+  }
+
+  qrBtn.addEventListener("click", () => toggleQr());
+  qrOverlay.addEventListener("click", () => toggleQr(false));
+  // Ein Klick auf den Text des leeren Screens blendet den Code ein
+  placeholder.addEventListener("click", () => toggleQr(true));
 
   /* ---------- Ton ---------- */
 
