@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Audiodateien nie als Text normalisieren
+*.mp3 binary

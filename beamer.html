@@ -548,6 +548,72 @@
     background: rgba(60,20,14,0.7);
   }
 
+  /* Leiste darf bei vielen Bedienelementen umbrechen */
+  .controls { flex-wrap: wrap; justify-content: flex-end; max-width: 76vw; }
+
+  /* Ton-Gruppe: Mute-Button und Regler in einer Pille */
+  .ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(11,13,18,0.78);
+    border: 1px solid rgba(176,141,87,0.45);
+    border-radius: 20px;
+    padding-right: 16px;
+  }
+  .ctrl-group .ctrl { background: none; border-color: transparent; }
+  .ctrl-group .ctrl:hover:not(:disabled) { border-color: transparent; }
+
+  input[type="range"].volume {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 104px;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--gold) var(--vol, 60%), rgba(244,239,228,0.2) var(--vol, 60%));
+    cursor: pointer;
+  }
+  input[type="range"].volume:focus { outline: none; }
+  input[type="range"].volume::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, var(--gold-light), var(--gold));
+    border: 1px solid rgba(0,0,0,0.5);
+  }
+  input[type="range"].volume::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, var(--gold-light), var(--gold));
+    border: 1px solid rgba(0,0,0,0.5);
+  }
+
+  /* Hinweis, falls der Browser Autoplay mit Ton blockiert */
+  .sound-hint {
+    position: fixed;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 8;
+    display: none;
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    color: #f2dcb4;
+    background: rgba(11,13,18,0.88);
+    border: 1px solid rgba(217,184,120,0.6);
+    border-radius: 20px;
+    padding: 9px 20px;
+    cursor: pointer;
+    animation: flicker 2.6s ease-in-out infinite;
+  }
+  .sound-hint.visible { display: block; }
+
+  /* Mauszeiger verschwindet zusammen mit der Bedienleiste */
+  body.idle { cursor: none; }
+
   /* ---------- Einzelansicht ---------- */
   .focus {
     position: fixed;
@@ -736,7 +802,15 @@
   <button class="ctrl" id="focus-btn" type="button" disabled>Einzeln zeigen</button>
   <button class="ctrl" id="download-btn" type="button" disabled>Download</button>
   <button class="ctrl" id="clear-btn" type="button" disabled>Leeren</button>
+  <button class="ctrl" id="fullscreen-btn" type="button">Vollbild</button>
+  <div class="ctrl-group">
+    <button class="ctrl" id="mute-btn" type="button">Ton aus</button>
+    <input class="volume" id="volume" type="range" min="0" max="100" value="60" aria-label="Lautstärke">
+  </div>
 </div>
+
+<audio id="ambience" src="audio/audio.mp3" loop preload="auto"></audio>
+<button class="sound-hint" id="sound-hint" type="button">Ton starten – hier oder irgendwo klicken</button>
 
 <div class="focus" id="focus">
   <div class="focus-inner">
@@ -766,6 +840,9 @@
 
   // Merkt sich über einen Reload hinweg, bis wann geleert wurde
   const CLEAR_KEY = "orakil-cleared-before";
+  const VOL_KEY = "orakil-volume";
+  const MUTE_KEY = "orakil-muted";
+  const DEFAULT_VOLUME = 60;
   const CONTROLS_HIDE_MS = 3500;
   const UNDO_VISIBLE_MS = 15000;
   const CONFIRM_WINDOW_MS = 4000;
@@ -785,16 +862,33 @@
   const nextBtn = document.getElementById("next-btn");
   const undoBar = document.getElementById("undo-bar");
   const undoBtn = document.getElementById("undo-btn");
+  const audio = document.getElementById("ambience");
+  const muteBtn = document.getElementById("mute-btn");
+  const volumeInput = document.getElementById("volume");
+  const soundHint = document.getElementById("sound-hint");
+  const fullscreenBtn = document.getElementById("fullscreen-btn");
 
   const knownKeys = new Set();
   // sprueche: älteste zuerst
   let sprueche = [];
   let hasContent = false;
+  // localStorage kann in restriktiven Browsermodi werfen – darf den Beamer nie stoppen
+  const safeStore = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, String(v)); } catch {} },
+    del(k) { try { localStorage.removeItem(k); } catch {} },
+  };
   const store = {
-    get() { try { return Number(localStorage.getItem(CLEAR_KEY) || 0) || 0; } catch { return 0; } },
-    set(v) { try { v ? localStorage.setItem(CLEAR_KEY, String(v)) : localStorage.removeItem(CLEAR_KEY); } catch {} },
+    get() { return Number(safeStore.get(CLEAR_KEY) || 0) || 0; },
+    set(v) { v ? safeStore.set(CLEAR_KEY, v) : safeStore.del(CLEAR_KEY); },
   };
   let clearedBefore = store.get();
+
+  let muted = safeStore.get(MUTE_KEY) === "1";
+  // Achtung: Number(null) waere 0 – ohne gespeicherten Wert muss der Standard greifen
+  const storedVolume = safeStore.get(VOL_KEY);
+  let volume = storedVolume === null || storedVolume === "" ? DEFAULT_VOLUME : Number(storedVolume);
+  if (!Number.isFinite(volume) || volume < 0 || volume > 100) volume = DEFAULT_VOLUME;
   let inFocus = false;
   let focusIndex = 0;
   let lastCleared = null;
@@ -989,9 +1083,11 @@
 
   function showControls() {
     controls.classList.add("visible");
+    document.body.classList.remove("idle");
     clearTimeout(controlsTimer);
     controlsTimer = setTimeout(() => {
       controls.classList.remove("visible");
+      document.body.classList.add("idle");
       disarmClear();
     }, CONTROLS_HIDE_MS);
   }
@@ -1029,6 +1125,8 @@
     // Enter/Leertaste würde sonst zusätzlich den fokussierten Button auslösen
     const onButton = e.target && e.target.closest && e.target.closest("button");
     if (onButton && (e.key === "Enter" || e.key === " ")) return;
+    if (e.key === "m" || e.key === "M") { muteBtn.click(); return; }
+    if (e.key === "f" || e.key === "F") { toggleFullscreen(); return; }
     if (e.key === "Enter" || e.key === "e" || e.key === "E") {
       if (!inFocus) enterFocus(); else exitFocus();
       return;
@@ -1038,6 +1136,92 @@
     if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); step(-1); }
     if (e.key === "n" || e.key === "N") showFocusEntry(sprueche.length - 1);
   });
+
+  /* ---------- Ton ---------- */
+
+  function applyAudio() {
+    audio.volume = volume / 100;
+    audio.muted = muted;
+    volumeInput.value = String(volume);
+    volumeInput.style.setProperty("--vol", volume + "%");
+    muteBtn.textContent = muted ? "Ton an" : "Ton aus";
+  }
+
+  // Browser blockieren Autoplay mit Ton, bis die Seite eine Nutzeraktion gesehen hat.
+  // Klappt es nicht, erscheint ein Hinweis und der naechste Klick startet den Ton.
+  function startAudio() {
+    const p = audio.play();
+    if (p && typeof p.then === "function") {
+      p.then(() => soundHint.classList.remove("visible"))
+       .catch(() => soundHint.classList.add("visible"));
+    }
+  }
+
+  function unlockAudio() {
+    if (!audio.paused) return;
+    const p = audio.play();
+    if (p && typeof p.then === "function") {
+      p.then(() => soundHint.classList.remove("visible")).catch(() => {});
+    }
+  }
+
+  document.addEventListener("pointerdown", unlockAudio);
+  document.addEventListener("keydown", unlockAudio);
+  soundHint.addEventListener("click", () => {
+    unlockAudio();
+    soundHint.classList.remove("visible");
+  });
+
+  muteBtn.addEventListener("click", () => {
+    muted = !muted;
+    safeStore.set(MUTE_KEY, muted ? "1" : "0");
+    applyAudio();
+    if (!muted) unlockAudio();
+  });
+
+  volumeInput.addEventListener("input", () => {
+    volume = Number(volumeInput.value);
+    safeStore.set(VOL_KEY, volume);
+    // Am Regler ziehen hebt eine Stummschaltung auf
+    if (volume > 0 && muted) {
+      muted = false;
+      safeStore.set(MUTE_KEY, "0");
+    }
+    applyAudio();
+    unlockAudio();
+  });
+
+  /* ---------- Vollbild ---------- */
+
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function updateFullscreenLabel() {
+    fullscreenBtn.textContent = isFullscreen() ? "Vollbild beenden" : "Vollbild";
+  }
+
+  function toggleFullscreen() {
+    try {
+      if (isFullscreen()) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (exit) exit.call(document);
+      } else {
+        const el = document.documentElement;
+        const req = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (req) {
+          const p = req.call(el);
+          if (p && typeof p.catch === "function") p.catch(() => {});
+        }
+      }
+    } catch (err) {
+      // Vollbild kann vom Browser verweigert werden – kein Grund abzustuerzen
+    }
+  }
+
+  fullscreenBtn.addEventListener("click", toggleFullscreen);
+  document.addEventListener("fullscreenchange", updateFullscreenLabel);
+  document.addEventListener("webkitfullscreenchange", updateFullscreenLabel);
 
   /* ---------- Polling ---------- */
 
@@ -1071,6 +1255,9 @@
   }
 
   updateControls();
+  applyAudio();
+  updateFullscreenLabel();
+  startAudio();
   showControls();
   poll();
   setInterval(poll, POLL_INTERVAL_MS);
