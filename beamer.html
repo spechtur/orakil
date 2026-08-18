@@ -233,6 +233,8 @@
     font-style: italic;
   }
 
+  .placeholder.revealing { animation: reveal 1.6s ease-out; }
+
   .spruch-card {
     position: relative;
     background:
@@ -771,7 +773,7 @@
 </header>
 
 <main id="main">
-  <p class="placeholder" id="placeholder">Die ersten Orakelsprüche erscheinen hier in Kürze …</p>
+  <p class="placeholder" id="placeholder">Noch schweigt das Orakil. Doch eure Fragen sind längst unterwegs.</p>
 </main>
 
 <div class="brazier left" aria-hidden="true">
@@ -805,6 +807,7 @@
   <button class="ctrl" id="fullscreen-btn" type="button">Vollbild</button>
   <div class="ctrl-group">
     <button class="ctrl" id="mute-btn" type="button">Ton aus</button>
+    <button class="ctrl" id="pause-btn" type="button">Pause</button>
     <input class="volume" id="volume" type="range" min="0" max="100" value="60" aria-label="Lautstärke">
   </div>
 </div>
@@ -846,6 +849,15 @@
   const CONTROLS_HIDE_MS = 3500;
   const UNDO_VISIBLE_MS = 15000;
   const CONFIRM_WINDOW_MS = 4000;
+  const PLACEHOLDER_ROTATE_MS = 14000;
+
+  // Zeilen fuer den noch leeren Screen waehrend Einfuehrung und Eingabe
+  const PLACEHOLDER_LINES = [
+    "Noch schweigt das Orakil. Doch eure Fragen sind längst unterwegs.",
+    "Die Flammen sammeln, was ihr denkt – gleich geben sie es zurück.",
+    "Was kommt, ist ungeschrieben. Die Maschine buchstabiert bereits daran.",
+    "Zwischen euren Stichworten und dem Spruch liegt nur ein Atemzug Rauch.",
+  ];
 
   const main = document.getElementById("main");
   const placeholder = document.getElementById("placeholder");
@@ -867,6 +879,7 @@
   const volumeInput = document.getElementById("volume");
   const soundHint = document.getElementById("sound-hint");
   const fullscreenBtn = document.getElementById("fullscreen-btn");
+  const pauseBtn = document.getElementById("pause-btn");
 
   const knownKeys = new Set();
   // sprueche: älteste zuerst
@@ -885,6 +898,7 @@
   let clearedBefore = store.get();
 
   let muted = safeStore.get(MUTE_KEY) === "1";
+  let userPaused = false;
   // Achtung: Number(null) waere 0 – ohne gespeicherten Wert muss der Standard greifen
   const storedVolume = safeStore.get(VOL_KEY);
   let volume = storedVolume === null || storedVolume === "" ? DEFAULT_VOLUME : Number(storedVolume);
@@ -910,13 +924,36 @@
     return card;
   }
 
+  let placeholderTimer = null;
+  let placeholderIndex = 0;
+
+  function rotatePlaceholder() {
+    placeholderIndex = (placeholderIndex + 1) % PLACEHOLDER_LINES.length;
+    placeholder.classList.remove("revealing");
+    void placeholder.offsetWidth;
+    placeholder.textContent = PLACEHOLDER_LINES[placeholderIndex];
+    placeholder.classList.add("revealing");
+  }
+
+  function startPlaceholderRotation() {
+    clearInterval(placeholderTimer);
+    placeholderTimer = setInterval(rotatePlaceholder, PLACEHOLDER_ROTATE_MS);
+  }
+
+  function stopPlaceholderRotation() {
+    clearInterval(placeholderTimer);
+    placeholderTimer = null;
+  }
+
   function showPlaceholder(show) {
     if (show && hasContent) {
       main.appendChild(placeholder);
       hasContent = false;
+      startPlaceholderRotation();
     } else if (!show && !hasContent) {
       placeholder.remove();
       hasContent = true;
+      stopPlaceholderRotation();
     }
   }
 
@@ -1126,6 +1163,7 @@
     const onButton = e.target && e.target.closest && e.target.closest("button");
     if (onButton && (e.key === "Enter" || e.key === " ")) return;
     if (e.key === "m" || e.key === "M") { muteBtn.click(); return; }
+    if (e.key === "p" || e.key === "P") { pauseBtn.click(); return; }
     if (e.key === "f" || e.key === "F") { toggleFullscreen(); return; }
     if (e.key === "Enter" || e.key === "e" || e.key === "E") {
       if (!inFocus) enterFocus(); else exitFocus();
@@ -1158,12 +1196,35 @@
   }
 
   function unlockAudio() {
+    // Eine bewusste Pause darf nicht durch einen beliebigen Klick aufgehoben werden
+    if (userPaused) return;
     if (!audio.paused) return;
     const p = audio.play();
     if (p && typeof p.then === "function") {
       p.then(() => soundHint.classList.remove("visible")).catch(() => {});
     }
   }
+
+  /* Pause und Neustart – bewusst von vorne, damit der Song auf Kommando einsetzt */
+
+  function updatePauseLabel() {
+    pauseBtn.textContent = audio.paused ? "Von vorne" : "Pause";
+  }
+
+  pauseBtn.addEventListener("click", () => {
+    if (audio.paused) {
+      audio.currentTime = 0;
+      userPaused = false;
+      startAudio();
+    } else {
+      userPaused = true;
+      audio.pause();
+    }
+    updatePauseLabel();
+  });
+
+  audio.addEventListener("play", updatePauseLabel);
+  audio.addEventListener("pause", updatePauseLabel);
 
   document.addEventListener("pointerdown", unlockAudio);
   document.addEventListener("keydown", unlockAudio);
@@ -1256,8 +1317,10 @@
 
   updateControls();
   applyAudio();
+  updatePauseLabel();
   updateFullscreenLabel();
   startAudio();
+  startPlaceholderRotation();
   showControls();
   poll();
   setInterval(poll, POLL_INTERVAL_MS);
