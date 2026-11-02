@@ -1,5 +1,6 @@
 # Orakil
 
+Test
 Interaktive Einstiegsaktivität für die Kickoff-Veranstaltung der KI-Offensive Zyklus 3 (PHGR, Herbstsemester).
 
 Teilnehmende geben auf dem Smartphone drei Stichworte zu ihrer aktuellen "Situation mit KI" ein. Ein LLM generiert daraus einen kryptisch-wohlwollenden, zur Diskussion einladenden Orakelspruch im antiken Register. Neu generierte Sprüche erscheinen zusätzlich live auf einer gemeinsamen Beamer-Ansicht.
